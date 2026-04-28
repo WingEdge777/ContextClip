@@ -50,7 +50,11 @@ function block(text: string): string {
 }
 
 function renderListItem(blocks: BlockNode[]): string {
-  return renderBlocks(blocks).trim().replace(/\n/g, "\n  ");
+  return blocks
+    .map((b) => renderBlock(b).trim())
+    .filter(Boolean)
+    .join("\n")
+    .replace(/\n/g, "\n  ");
 }
 
 function renderTable(rows: string[][]): string {

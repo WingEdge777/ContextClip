@@ -28,8 +28,10 @@ function withFrontmatter(result: ExtractResult): string {
 }
 
 const OVERLAY_ID = "md-context-claw-overlay";
+const RECT_ID = "md-context-claw-rect";
 const TOOLBAR_ID = "md-context-claw-toolbar";
 const IGNORE_CLICK_ATTR = "data-md-context-claw-ignore";
+const LONG_PRESS_MS = 200;
 
 let hoveredElement: HTMLElement | null = null;
 let cleanupSelectionMode: (() => void) | null = null;
@@ -58,6 +60,11 @@ if (!messageListenerInstalled) {
   });
 }
 
+type DragState =
+  | { phase: "idle" }
+  | { phase: "pending"; startX: number; startY: number; timer: ReturnType<typeof setTimeout> }
+  | { phase: "recting"; startX: number; startY: number };
+
 function activateSelectionMode(): void {
   cleanupSelectionMode?.();
   const theme = getHostTheme();
@@ -73,6 +80,18 @@ function activateSelectionMode(): void {
     "border-radius:14px",
     `box-shadow:0 0 0 1px ${theme.overlayBorder}, 0 18px 36px rgba(15,23,42,0.12)`,
     "transition:all 120ms ease"
+  ].join(";");
+
+  const rectEl = document.createElement("div");
+  rectEl.id = RECT_ID;
+  rectEl.style.cssText = [
+    "position:fixed",
+    "z-index:2147483646",
+    "pointer-events:none",
+    `border:2px solid ${theme.accent}`,
+    `background:${rgba(theme.accent, 0.08)}`,
+    "border-radius:4px",
+    "display:none"
   ].join(";");
 
   const toolbar = document.createElement("div");
@@ -95,7 +114,7 @@ function activateSelectionMode(): void {
     "backdrop-filter:blur(16px)"
   ].join(";");
   toolbar.innerHTML = `
-    <span data-role="label">Pick block</span>
+    <span data-role="label">Pick block or drag to select</span>
     <button data-action="copy">Copy</button>
     <button data-action="download">Download</button>
     <button data-action="cancel">Cancel</button>
@@ -134,9 +153,72 @@ function activateSelectionMode(): void {
 
   let currentResult: ExtractResult | null = null;
   let pinnedElement: HTMLElement | null = null;
+  let rectPinned = false;
+  let drag: DragState = { phase: "idle" };
 
-  const handleMove = (event: MouseEvent) => {
-    if (pinnedElement) {
+  function hideOverlay(): void {
+    overlay.style.width = "0";
+    overlay.style.height = "0";
+  }
+
+  function showRect(x1: number, y1: number, x2: number, y2: number): void {
+    const left = Math.min(x1, x2);
+    const top = Math.min(y1, y2);
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
+    rectEl.style.left = `${left}px`;
+    rectEl.style.top = `${top}px`;
+    rectEl.style.width = `${width}px`;
+    rectEl.style.height = `${height}px`;
+    rectEl.style.display = "block";
+  }
+
+  function hideRect(): void {
+    rectEl.style.display = "none";
+  }
+
+  const handleMouseDown = (event: MouseEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(`#${TOOLBAR_ID}`) || target?.closest(`[${IGNORE_CLICK_ATTR}]`)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const timer = setTimeout(() => {
+      if (drag.phase === "pending") {
+        drag = { phase: "recting", startX: drag.startX, startY: drag.startY };
+        hideOverlay();
+        label.textContent = "Drag to select area";
+      }
+    }, LONG_PRESS_MS);
+
+    drag = { phase: "pending", startX: event.clientX, startY: event.clientY, timer };
+  };
+
+  const handleMouseMove = (event: MouseEvent) => {
+    if (drag.phase === "recting") {
+      showRect(drag.startX, drag.startY, event.clientX, event.clientY);
+      return;
+    }
+
+    if (drag.phase === "pending") {
+      const dx = Math.abs(event.clientX - drag.startX);
+      const dy = Math.abs(event.clientY - drag.startY);
+      if (dx > 5 || dy > 5) {
+        clearTimeout(drag.timer);
+        drag = { phase: "recting", startX: drag.startX, startY: drag.startY };
+        hideOverlay();
+        label.textContent = "Drag to select area";
+      }
+      return;
+    }
+
+    if (pinnedElement || rectPinned) {
       return;
     }
 
@@ -157,37 +239,95 @@ function activateSelectionMode(): void {
     overlay.style.height = `${rect.height}px`;
   };
 
-  const handleClick = (event: MouseEvent) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest(`#${TOOLBAR_ID}`) || target?.closest(`[${IGNORE_CLICK_ATTR}]`)) {
+  const handleMouseUp = (event: MouseEvent) => {
+    if (event.button !== 0) {
       return;
     }
 
-    if (!hoveredElement) {
+    if (drag.phase === "pending") {
+      clearTimeout(drag.timer);
+      drag = { phase: "idle" };
+
+      if (!hoveredElement) {
+        return;
+      }
+
+      pinnedElement = hoveredElement;
+      currentResult = extractElement(pinnedElement);
+      rectPinned = false;
+      hideRect();
+      void chrome.runtime.sendMessage({
+        type: "selection-complete",
+        payload: currentResult
+      } satisfies RuntimeMessage);
+
+      label.textContent = currentResult.title.slice(0, 40);
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    pinnedElement = hoveredElement;
-    currentResult = extractElement(pinnedElement);
-    void chrome.runtime.sendMessage({
-      type: "selection-complete",
-      payload: currentResult
-    } satisfies RuntimeMessage);
+    if (drag.phase === "recting") {
+      const x1 = drag.startX;
+      const y1 = drag.startY;
+      const x2 = event.clientX;
+      const y2 = event.clientY;
 
-    label.textContent = currentResult.title.slice(0, 40);
+      drag = { phase: "idle" };
+
+      if (Math.abs(x2 - x1) < 10 || Math.abs(y2 - y1) < 10) {
+        hideRect();
+        return;
+      }
+
+      const left = Math.min(x1, x2);
+      const top = Math.min(y1, y2);
+      const right = Math.max(x1, x2);
+      const bottom = Math.max(y1, y2);
+
+      const result = extractFromRect(left, top, right, bottom);
+
+      if (!result) {
+        hideRect();
+        label.textContent = "No content in selection";
+        return;
+      }
+
+      currentResult = result;
+      rectPinned = true;
+      pinnedElement = null;
+      void chrome.runtime.sendMessage({
+        type: "selection-complete",
+        payload: currentResult
+      } satisfies RuntimeMessage);
+
+      label.textContent = currentResult.title.slice(0, 40);
+      return;
+    }
   };
 
   const handleContextMenu = (event: MouseEvent) => {
-    if (!pinnedElement) {
+    if (drag.phase !== "idle") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (drag.phase === "pending") {
+        clearTimeout(drag.timer);
+      }
+      drag = { phase: "idle" };
+      hideRect();
+      return;
+    }
+
+    if (!pinnedElement && !rectPinned) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
     pinnedElement = null;
-    label.textContent = currentResult ? currentResult.title.slice(0, 40) : "Pick block";
+    rectPinned = false;
+    hoveredElement = null;
+    hideOverlay();
+    hideRect();
+    label.textContent = currentResult ? currentResult.title.slice(0, 40) : "Pick block or drag to select";
   };
 
   const handleToolbar = async (event: MouseEvent) => {
@@ -225,29 +365,41 @@ function activateSelectionMode(): void {
 
   const handleEscape = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
-      if (pinnedElement) {
+      if (drag.phase === "pending") {
+        clearTimeout(drag.timer);
+      }
+      drag = { phase: "idle" };
+
+      if (pinnedElement || rectPinned || currentResult) {
         pinnedElement = null;
-        label.textContent = currentResult ? currentResult.title.slice(0, 40) : "Pick block";
+        rectPinned = false;
+        hoveredElement = null;
+        hideOverlay();
+        hideRect();
+        label.textContent = currentResult ? currentResult.title.slice(0, 40) : "Pick block or drag to select";
         return;
       }
       cleanup();
     }
   };
 
-  document.body.append(overlay, toolbar);
-  document.addEventListener("mousemove", handleMove, true);
-  document.addEventListener("click", handleClick, true);
+  document.body.append(overlay, rectEl, toolbar);
+  document.addEventListener("mousedown", handleMouseDown, true);
+  document.addEventListener("mousemove", handleMouseMove, true);
+  document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("contextmenu", handleContextMenu, true);
   toolbar.addEventListener("click", handleToolbar, true);
   document.addEventListener("keydown", handleEscape, true);
 
   function cleanup(): void {
-    document.removeEventListener("mousemove", handleMove, true);
-    document.removeEventListener("click", handleClick, true);
+    document.removeEventListener("mousedown", handleMouseDown, true);
+    document.removeEventListener("mousemove", handleMouseMove, true);
+    document.removeEventListener("mouseup", handleMouseUp, true);
     document.removeEventListener("contextmenu", handleContextMenu, true);
     toolbar.removeEventListener("click", handleToolbar, true);
     document.removeEventListener("keydown", handleEscape, true);
     overlay.remove();
+    rectEl.remove();
     toolbar.remove();
     hoveredElement = null;
     pinnedElement = null;
@@ -255,6 +407,115 @@ function activateSelectionMode(): void {
   }
 
   cleanupSelectionMode = cleanup;
+}
+
+function extractFromRect(left: number, top: number, right: number, bottom: number): ExtractResult | null {
+  const startRange = document.caretRangeFromPoint(left, top);
+  const endRange = document.caretRangeFromPoint(right, bottom);
+
+  if (!startRange || !endRange) {
+    return extractFromRectFallback(left, top, right, bottom);
+  }
+
+  const range = document.createRange();
+  try {
+    range.setStart(startRange.startContainer, startRange.startOffset);
+    range.setEnd(endRange.startContainer, endRange.startOffset);
+  } catch {
+    try {
+      range.setStart(endRange.startContainer, endRange.startOffset);
+      range.setEnd(startRange.startContainer, startRange.startOffset);
+    } catch {
+      return extractFromRectFallback(left, top, right, bottom);
+    }
+  }
+
+  if (range.collapsed) {
+    return extractFromRectFallback(left, top, right, bottom);
+  }
+
+  const fragment = range.cloneContents();
+  if (!fragment.hasChildNodes()) {
+    return extractFromRectFallback(left, top, right, bottom);
+  }
+
+  const container = document.createElement("div");
+  container.appendChild(fragment);
+
+  return extractElement(container);
+}
+
+function extractFromRectFallback(left: number, top: number, right: number, bottom: number): ExtractResult | null {
+  const rect = new DOMRect(left, top, right - left, bottom - top);
+  const elements = findElementsInRect(rect);
+  if (elements.length === 0) {
+    return null;
+  }
+
+  const container = document.createElement("div");
+  for (const el of elements) {
+    container.appendChild(el.cloneNode(true));
+  }
+
+  return extractElement(container);
+}
+
+function findElementsInRect(rect: DOMRect): Element[] {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node) {
+      if (!(node instanceof HTMLElement)) {
+        return NodeFilter.FILTER_SKIP;
+      }
+      if (node.id === OVERLAY_ID || node.id === RECT_ID || node.id === TOOLBAR_ID) {
+        return NodeFilter.FILTER_SKIP;
+      }
+      if (node.closest(`#${TOOLBAR_ID}`)) {
+        return NodeFilter.FILTER_SKIP;
+      }
+
+      const box = node.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) {
+        return NodeFilter.FILTER_SKIP;
+      }
+
+      const overlapLeft = Math.max(box.left, rect.left);
+      const overlapTop = Math.max(box.top, rect.top);
+      const overlapRight = Math.min(box.right, rect.right);
+      const overlapBottom = Math.min(box.bottom, rect.bottom);
+      const overlapArea = Math.max(0, overlapRight - overlapLeft) * Math.max(0, overlapBottom - overlapTop);
+      const elementArea = box.width * box.height;
+      const overlapRatio = overlapArea / elementArea;
+
+      if (overlapRatio < 0.5) {
+        return NodeFilter.FILTER_SKIP;
+      }
+
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const accepted = new Set<Element>();
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const element = node as Element;
+    let dominated = false;
+    for (const existing of accepted) {
+      if (existing.contains(element)) {
+        dominated = true;
+        break;
+      }
+    }
+    if (!dominated) {
+      for (const existing of accepted) {
+        if (element.contains(existing)) {
+          accepted.delete(existing);
+        }
+      }
+      accepted.add(element);
+    }
+  }
+
+  return Array.from(accepted);
 }
 
 function getHostTheme(): {
