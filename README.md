@@ -6,7 +6,7 @@ Not a web saver (but can be). A precision tool for feeding local LLMs.
 
 ## Why
 
-LLMs need clean context. Web pages are noisy. You want three paragraphs from a GitHub README, not the sidebar, not the nav, not the comments.
+Text-only LLMs need clean context. Web pages are noisy. You want three paragraphs from a GitHub README, not the sidebar, not the nav, not the comments.
 
 ContextClip runs entirely in your browser — no server, no API key, no data leaving your machine. It works on login-required pages that server-side fetchers can't reach.
 
@@ -43,6 +43,8 @@ General extraction works on any page via Readability. Deeper cleanup for:
 Quality over coverage. Better to extract three sites well than thirty sites poorly.
 
 ## Install
+
+### Install From Source
 
 ```bash
 pnpm install
