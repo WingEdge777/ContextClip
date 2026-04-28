@@ -55,7 +55,6 @@ app.innerHTML = `
       <div class="action-row">
         <button id="copy-result" class="mini-action" disabled>Copy Markdown</button>
         <button id="download-result" class="mini-action" disabled>Download File</button>
-        <button id="crawl-site" class="mini-action" disabled>Site Crawl</button>
       </div>
     </section>
 

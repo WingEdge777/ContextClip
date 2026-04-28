@@ -79,6 +79,24 @@ h1 {
   line-height: 1;
   letter-spacing: -0.03em;
   font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", "Segoe UI", sans-serif;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.brand-name {
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 24px;
+}
+
+.brand-tag {
+  color: var(--text);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .subhead {

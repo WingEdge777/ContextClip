@@ -56,6 +56,12 @@ if (!messageListenerInstalled) {
       return false;
     }
 
+    if (message.type === "notify-copy") {
+      void handleNotifyCopy(message.payload);
+      sendResponse({ ok: true });
+      return false;
+    }
+
     return false;
   });
 }
@@ -64,6 +70,61 @@ type DragState =
   | { phase: "idle" }
   | { phase: "pending"; startX: number; startY: number; timer: ReturnType<typeof setTimeout> }
   | { phase: "recting"; startX: number; startY: number };
+
+const TOAST_ID = "context-clip-toast";
+
+async function handleNotifyCopy(result: ExtractResult): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(withFrontmatter(result));
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = withFrontmatter(result);
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
+  showToast("Copied to clipboard");
+}
+
+function showToast(text: string): void {
+  const existing = document.getElementById(TOAST_ID);
+  if (existing) {
+    existing.remove();
+  }
+
+  const toast = document.createElement("div");
+  toast.id = TOAST_ID;
+  toast.textContent = text;
+  toast.style.cssText = [
+    "position:fixed",
+    "z-index:2147483647",
+    "top:20px",
+    "right:20px",
+    "padding:10px 18px",
+    "border-radius:10px",
+    "background:#1f2937",
+    "color:#f8fafc",
+    "font:13px/1.35 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+    "font-weight:600",
+    "box-shadow:0 18px 44px rgba(15,23,42,0.16)",
+    "pointer-events:none",
+    "opacity:0",
+    "transition:opacity 200ms ease"
+  ].join(";");
+
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 200);
+  }, 1800);
+}
 
 function activateSelectionMode(): void {
   cleanupSelectionMode?.();
