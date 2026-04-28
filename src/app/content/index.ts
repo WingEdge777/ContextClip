@@ -27,10 +27,10 @@ function withFrontmatter(result: ExtractResult): string {
   return `${lines.join("\n")}\n\n${result.markdown}\n`;
 }
 
-const OVERLAY_ID = "md-context-claw-overlay";
-const RECT_ID = "md-context-claw-rect";
-const TOOLBAR_ID = "md-context-claw-toolbar";
-const IGNORE_CLICK_ATTR = "data-md-context-claw-ignore";
+const OVERLAY_ID = "context-clip-overlay";
+const RECT_ID = "context-clip-rect";
+const TOOLBAR_ID = "context-clip-toolbar";
+const IGNORE_CLICK_ATTR = "data-context-clip-ignore";
 const LONG_PRESS_MS = 200;
 
 let hoveredElement: HTMLElement | null = null;

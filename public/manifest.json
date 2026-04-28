@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MDContextClaw",
+  "name": "ContextClip",
   "version": "0.1.0",
   "description": "Extract AI-ready Markdown from the current page.",
   "permissions": ["activeTab", "downloads", "scripting", "storage"],
@@ -11,7 +11,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "MDContextClaw",
+    "default_title": "ContextClip",
     "default_icon": {
       "16": "icons/icon16.svg",
       "48": "icons/icon48.svg",

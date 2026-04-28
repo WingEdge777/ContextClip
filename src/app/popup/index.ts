@@ -16,7 +16,7 @@ app.innerHTML = `
     <header class="hero panel">
       <div class="hero-copy">
         <p class="eyebrow">AI-ready context</p>
-        <h1>MDContextClaw</h1>
+        <h1>ContextClip</h1>
         <p class="subhead">Clean current page or a picked block into Markdown.</p>
       </div>
     </header>

@@ -1,96 +1,108 @@
-# MDContextClaw
+# ContextClip
 
-Chrome extension. Turn a few high-value web pages into AI-ready context.
+Chrome extension. Clip precise content from web pages into AI-ready Markdown.
 
-Built for focused extraction, not "save the whole web".
+Not a web saver (but can be). A precision tool for feeding local LLMs.
 
-## Highlights
+## Why
 
-- `Extract This Page`
-  - Pull main content from current page
-  - Strip common noise
-  - Add YAML frontmatter metadata
+LLMs need clean context. Web pages are noisy. You want three paragraphs from a GitHub README, not the sidebar, not the nav, not the comments.
 
-- `Pick & Extract`
-  - Hover and pick semantic blocks
-  - Extract article / section / code / table
-  - Copy or download fast
+ContextClip runs entirely in your browser — no server, no API key, no data leaving your machine. It works on login-required pages that server-side fetchers can't reach.
 
-- Smart output fallback
-  - Pure text page -> `.md`
-  - Rich page with light media -> Markdown + media links
-  - Heavy media page -> `.zip` with `page.md` + `manifest.json`
+## What It Does
 
-- AI-ready by default
-  - Clean headings
-  - Fenced code blocks
-  - Absolute links
-  - Source metadata
+### Extract This Page
 
-## Focus
+One click. Pulls main content, strips noise, adds YAML frontmatter with source metadata.
 
-This project does **not** aim to support every site equally.
+### Pick & Extract
 
-Initial product shape:
+Two ways to select:
 
-- General extraction for normal article pages
-- Deep cleanup for a small number of high-value sites
-- Better output quality over broader site coverage
+- **Hover + click** — pick a semantic block (article, section, code, table)
+- **Drag a rectangle** — long-press and drag to draw a selection area. Uses Range API so you get the exact text inside the rectangle, even if it's half a paragraph
 
-Current likely priority sites:
+Both produce the same clean Markdown output.
 
-- `GitHub` single file / rendered docs
-- `微信公众号`
-- `知乎`
+### Smart output
 
-## Install Locally
+- Text pages → single `.md` file
+- Media-heavy pages → `.zip` with `page.md` + `manifest.json`
 
-### 1. Build
+All output includes YAML frontmatter: title, source URL, site, author, captured time, extraction mode.
+
+## Site Support
+
+General extraction works on any page via Readability. Deeper cleanup for:
+
+- **GitHub** — README, rendered docs, single file views
+- **微信公众号** — article body, author, title
+- **知乎** — column posts, answers
+
+Quality over coverage. Better to extract three sites well than thirty sites poorly.
+
+## Install
 
 ```bash
 pnpm install
 pnpm build
 ```
 
-### 2. Load in Chrome
-
 1. Open `chrome://extensions`
-2. Enable `Developer mode`
-3. Click `Load unpacked`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
 4. Select `dist/`
 
-## Use
+## Usage
 
 ### Extract current page
 
-1. Open target page
-2. Click extension icon
-3. Click `Extract This Page`
-4. Review preview
-5. Click `Copy Last Result` or `Download Last Result`
+1. Click extension icon
+2. Click **Extract This Page**
+3. Preview appears in popup
+4. **Copy as MD** / **Download MD** / **Download ZIP**
 
-### Pick part of page
+### Select part of a page
 
-1. Open target page
-2. Click extension icon
-3. Click `Pick & Extract`
-4. Hover block on page
-5. Click target block
-6. Use floating `Copy` or `Download`
-7. Press `Esc` or `Cancel` to quit picker
+1. Click extension icon
+2. Click **Pick & Extract**
+3. **Hover + click** to pick a block, or **long-press + drag** to draw a rectangle
+4. Use floating toolbar to **Copy** or **Download**
+5. **Right-click** to deselect and pick again, **Esc** again to quit
+
+### Controls in selection mode
+
+| Action | Effect |
+|--------|--------|
+| Click a block | Select that block |
+| Long-press + drag | Draw a rectangle to select area |
+| Right-click (with selection) | Deselect, return to hover mode |
+| Right-click (no selection) | Exit selection mode |
+| Esc (with selection) | Deselect, return to hover mode |
+| Esc (no selection) | Exit selection mode |
 
 ## Output
 
 ### Markdown
 
-- YAML frontmatter
-- Clean body content
-- Code fences
-- Image links
+```markdown
+---
+title: 'Example Page'
+source_url: 'https://example.com/page'
+site: 'example'
+author: 'Author Name'
+captured_at: '2026-04-28T10:45:13.901Z'
+mode: 'selection'
+selection_hint: 'article'
+---
+
+Page content here...
+```
 
 ### ZIP fallback
 
-Used when page is media-heavy.
+For media-heavy pages:
 
 ```text
 page-export/
@@ -98,66 +110,16 @@ page-export/
   manifest.json
 ```
 
-## Chrome Web Store
-
-Not live yet.
-
-After publish, install section will add:
-
-1. Chrome Web Store link
-2. One-click install path
-3. Version update notes
-
-## Project Structure
-
-```text
-public/manifest.json         Chrome extension manifest
-src/app/popup/index.ts       Popup UI
-src/app/popup/popup.css      Popup styles
-src/app/content/index.ts     In-page selection entry
-src/app/background/index.ts  Runtime result store
-src/extractor/               Extraction engine
-src/contracts/               Shared runtime contracts
-```
-
 ## Development
-
-### Start watch build
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-This watches source and rebuilds `dist/`.
-
-### Reload extension during dev
+Watches source and rebuilds `dist/`. After each rebuild:
 
 1. Open `chrome://extensions`
-2. Find `MDContextClaw`
-3. Click reload after each rebuild
+2. Find **ContextClip**
+3. Click reload
 4. Refresh target page if content script changed
-
-### Dev loop
-
-1. Edit files in `src/` or `public/manifest.json`
-2. Let Vite rebuild `dist/`
-3. Reload extension
-4. Re-test on real pages
-
-## Status And Roadmap
-
-### Current
-
-- Chrome `Manifest V3`
-- Local extraction only
-- `Extract This Page`
-- `Pick & Extract`
-- Markdown / ZIP fallback
-
-### Later
-
-- `Crawl This Site`
-- Site-specific cleanup rules
-- Better media packaging
-- `arXiv` adapter
