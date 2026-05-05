@@ -182,6 +182,9 @@ async function runExtractPage(): Promise<ExtractResult | null> {
     await ensurePageMessaging(tab.id);
     setStatus("Extracting");
     const response = await chrome.tabs.sendMessage(tab.id, { type: "extract-page" } satisfies RuntimeMessage);
+    if (!response?.result) {
+      throw new Error((response?.error as string | undefined) || "Extract failed");
+    }
     lastResult = response.result as ExtractResult;
 
     await chrome.runtime.sendMessage({

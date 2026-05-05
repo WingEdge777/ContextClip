@@ -82,6 +82,9 @@ async function handleCommand(command: string): Promise<void> {
   if (command === "extract-page") {
     try {
       const response = await chrome.tabs.sendMessage(tab.id, { type: "extract-page" } satisfies RuntimeMessage);
+      if (!response?.result) {
+        return;
+      }
       const result = response.result as ExtractResult;
       if (!result) {
         return;

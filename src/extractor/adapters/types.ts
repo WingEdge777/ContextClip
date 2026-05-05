@@ -20,5 +20,5 @@ export type AdaptedContent = {
 export type DomainAdapter = {
   name: string;
   match(root: HTMLElement, context: ExtractionContext): boolean;
-  transform(root: HTMLElement, context: ExtractionContext): AdaptedContent | null;
+  transform(root: HTMLElement, context: ExtractionContext): AdaptedContent | null | Promise<AdaptedContent | null>;
 };

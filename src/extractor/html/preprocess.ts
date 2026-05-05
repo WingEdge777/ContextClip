@@ -42,9 +42,9 @@ const NOISE_SELECTORS = [
   ".Link--primary[href^='#user-content-']"
 ];
 
-function absolutize(raw: string): string {
+function absolutize(raw: string, baseUrl: string): string {
   try {
-    return new URL(raw, document.baseURI).href;
+    return new URL(raw, baseUrl).href;
   } catch {
     return raw;
   }
@@ -60,12 +60,12 @@ function resolveLazySrc(element: HTMLImageElement): string {
   );
 }
 
-function normalizeMedia(root: HTMLElement): void {
+function normalizeMedia(root: HTMLElement, baseUrl: string): void {
   root.querySelectorAll("img").forEach((node) => {
     const element = node as HTMLImageElement;
     const src = resolveLazySrc(element);
     if (src) {
-      element.setAttribute("src", absolutize(src));
+      element.setAttribute("src", absolutize(src, baseUrl));
     }
   });
 
@@ -73,16 +73,16 @@ function normalizeMedia(root: HTMLElement): void {
     const element = node as HTMLMediaElement | HTMLSourceElement;
     const src = element.getAttribute("src") || "";
     if (src) {
-      element.setAttribute("src", absolutize(src));
+      element.setAttribute("src", absolutize(src, baseUrl));
     }
   });
 }
 
-function normalizeLinks(root: HTMLElement): void {
+function normalizeLinks(root: HTMLElement, baseUrl: string): void {
   root.querySelectorAll("a[href]").forEach((node) => {
     const href = node.getAttribute("href");
     if (href) {
-      node.setAttribute("href", absolutize(href));
+      node.setAttribute("href", absolutize(href, baseUrl));
     }
   });
 }
@@ -101,15 +101,15 @@ function normalizeCodeLanguage(root: HTMLElement): void {
   });
 }
 
-export function preprocessRoot(root: HTMLElement): HTMLElement {
+export function preprocessRoot(root: HTMLElement, baseUrl = document.baseURI): HTMLElement {
   const clone = root.cloneNode(true) as HTMLElement;
 
   for (const selector of NOISE_SELECTORS) {
     clone.querySelectorAll(selector).forEach((element) => element.remove());
   }
 
-  normalizeMedia(clone);
-  normalizeLinks(clone);
+  normalizeMedia(clone, baseUrl);
+  normalizeLinks(clone, baseUrl);
   normalizeCodeLanguage(clone);
 
   return clone;

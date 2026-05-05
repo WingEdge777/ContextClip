@@ -27,17 +27,19 @@ function normalizeCandidate(root: HTMLElement, meta: DocumentMetadata): ExtractR
   return buildExtractResult("page", normalized, root);
 }
 
-export function extractCurrentPage(): ExtractResult {
+export async function extractCurrentPage(): Promise<ExtractResult> {
   const rawRoot = extractPageHtml(document);
   const cleanRoot = preprocessRoot(rawRoot);
-  const adapted = adaptPage(cleanRoot, buildContext(document));
+  const adapted = await adaptPage(cleanRoot, buildContext(document));
   return normalizeCandidate(
     adapted.root,
     buildMetadata({
       title: adapted.title,
       sourceUrl: adapted.sourceUrl,
       site: adapted.site,
-      author: adapted.author
+      author: adapted.author,
+      createdAt: adapted.createdAt,
+      modifiedAt: adapted.modifiedAt
     })
   );
 }

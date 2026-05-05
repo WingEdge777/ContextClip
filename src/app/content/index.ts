@@ -48,8 +48,17 @@ if (!messageListenerInstalled) {
     }
 
     if (message.type === "extract-page") {
-      sendResponse({ result: extractCurrentPage() });
-      return false;
+      void extractCurrentPage()
+        .then((result) => {
+          sendResponse({ result });
+        })
+        .catch((error: unknown) => {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+      return true;
     }
 
     if (message.type === "start-selection") {

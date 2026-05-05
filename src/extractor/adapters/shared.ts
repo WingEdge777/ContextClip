@@ -1,5 +1,31 @@
 import type { AdaptedContent, ExtractionContext } from "./types";
 
+function stripDescriptor(value: string, label: string): string {
+  return value.replace(new RegExp(`^${label}\\s*:?\\s*`, "i"), "").trim();
+}
+
+function getArxivSubmissionHistoryText(document: Document): string | undefined {
+  return getText(document.querySelector(".submission-history"));
+}
+
+function getArxivModifiedTime(document: Document): string | undefined {
+  const history = getArxivSubmissionHistoryText(document);
+  if (!history) {
+    return undefined;
+  }
+
+  const matches = Array.from(
+    history.matchAll(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+\d{1,2}\s+\w{3}\s+\d{4}\s+\d{2}:\d{2}:\d{2}\s+UTC\b/g)
+  );
+  const value = matches.at(-1)?.[0];
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Date.parse(value.replace(" UTC", " GMT"));
+  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
+}
+
 export function detectSite(document: Document): string {
   const host = document.location.hostname;
   const canonical =
@@ -10,6 +36,12 @@ export function detectSite(document: Document): string {
 
   if (probe.includes("github.com")) {
     return "github";
+  }
+  if (
+    probe.includes("arxiv.org") ||
+    document.querySelector(".submission-history, #abs, article.ltx_document, .ltx_title_document")
+  ) {
+    return "arxiv";
   }
   if (probe.includes("mp.weixin.qq.com") || document.querySelector("#img-content, #js_article")) {
     return "weixin";
@@ -30,6 +62,19 @@ export function getSourceUrl(document: Document): string {
 
 export function getDocumentTitle(document: Document): string {
   const site = detectSite(document);
+
+  if (site === "arxiv") {
+    const title =
+      document.querySelector<HTMLMetaElement>("meta[property='og:title']")?.content?.trim() ||
+      document.querySelector<HTMLMetaElement>("meta[name='citation_title']")?.content?.trim() ||
+      getText(document.querySelector(".ltx_title_document")) ||
+      getText(document.querySelector("h1.title")) ||
+      getText(document.querySelector("main h1")) ||
+      getText(document.querySelector("h1"));
+    if (title) {
+      return stripDescriptor(title, "Title");
+    }
+  }
 
   if (site === "zhihu") {
     const title =
@@ -68,6 +113,23 @@ export function getDocumentTitle(document: Document): string {
 }
 
 export function getMetaAuthor(document: Document): string | undefined {
+  const citationAuthors = Array.from(document.querySelectorAll<HTMLMetaElement>("meta[name='citation_author']"))
+    .map((element) => element.content.trim())
+    .filter(Boolean);
+  if (citationAuthors.length > 0) {
+    return citationAuthors.join(", ");
+  }
+
+  if (detectSite(document) === "arxiv") {
+    const authors =
+      getText(document.querySelector(".authors")) ||
+      getText(document.querySelector(".ltx_authors")) ||
+      getText(document.querySelector(".ltx_creator"));
+    if (authors) {
+      return stripDescriptor(authors, "Authors");
+    }
+  }
+
   const meta = document.querySelector("meta[name='author'], meta[property='article:author']");
   return meta?.getAttribute("content")?.trim() || undefined;
 }
@@ -97,6 +159,8 @@ export function getCreatedAt(document: Document): string | undefined {
       "meta[name='og:published_time']",
       "meta[itemprop='datePublished']",
       "meta[name='datePublished']",
+      "meta[name='citation_date']",
+      "meta[name='citation_online_date']",
       "meta[name='publishdate']",
       "meta[name='publish_date']",
       "meta[name='pubdate']",
@@ -107,16 +171,19 @@ export function getCreatedAt(document: Document): string | undefined {
 }
 
 export function getModifiedAt(document: Document): string | undefined {
-  return getMetaContent(document, [
-    "meta[property='article:modified_time']",
-    "meta[name='article:modified_time']",
-    "meta[property='og:updated_time']",
-    "meta[name='og:updated_time']",
-    "meta[itemprop='dateModified']",
-    "meta[name='dateModified']",
-    "meta[name='lastmod']",
-    "meta[name='last-modified']"
-  ]);
+  return (
+    getMetaContent(document, [
+      "meta[property='article:modified_time']",
+      "meta[name='article:modified_time']",
+      "meta[property='og:updated_time']",
+      "meta[name='og:updated_time']",
+      "meta[itemprop='dateModified']",
+      "meta[name='dateModified']",
+      "meta[name='lastmod']",
+      "meta[name='last-modified']"
+    ]) ||
+    getArxivModifiedTime(document)
+  );
 }
 
 export function getText(element: Element | null | undefined): string | undefined {

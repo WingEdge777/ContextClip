@@ -36,6 +36,7 @@ All output includes YAML frontmatter: title, source URL, site, author, captured 
 
 General extraction works on any page via Readability. Deeper cleanup for:
 
+- **arXiv** — full paper via HTML endpoint, metadata via API, abs-page fallback
 - **GitHub** — README, rendered docs, single file views
 - **微信公众号** — article body, author, title
 - **知乎** — column posts, answers
