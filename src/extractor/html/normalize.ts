@@ -126,6 +126,31 @@ function inlineBlockFromNode(node: HTMLElement): BlockNode[] {
   return children.length > 0 ? [{ type: "paragraph", children }] : [];
 }
 
+function normalizeList(element: HTMLElement, ordered: boolean): BlockNode[] {
+  const items: BlockNode[][] = [];
+  let currentItem: BlockNode[] | null = null;
+
+  for (const child of Array.from(element.children)) {
+    if (child instanceof HTMLLIElement) {
+      currentItem = normalizeListItem(child);
+      if (currentItem.length > 0) {
+        items.push(currentItem);
+      }
+      continue;
+    }
+
+    const tag = child.tagName.toLowerCase();
+    if ((tag === "ul" || tag === "ol") && items.length > 0) {
+      const nested = normalizeList(child, tag === "ol");
+      if (nested.length > 0) {
+        items[items.length - 1].push(...nested);
+      }
+    }
+  }
+
+  return items.length > 0 ? [{ type: "list", ordered, items }] : [];
+}
+
 function normalizeBlockNode(node: Node): BlockNode[] {
   if (node.nodeType === Node.TEXT_NODE) {
     const value = collapseWhitespace(node.textContent ?? "").trim();
@@ -161,11 +186,7 @@ function normalizeBlockNode(node: Node): BlockNode[] {
     }
     case "ul":
     case "ol": {
-      const items = Array.from(node.children)
-        .filter((child): child is HTMLLIElement => child instanceof HTMLLIElement)
-        .map((item) => normalizeListItem(item))
-        .filter((item) => item.length > 0);
-      return items.length > 0 ? [{ type: "list", ordered: tag === "ol", items }] : [];
+      return normalizeList(node, tag === "ol");
     }
     case "blockquote": {
       const children = normalizeBlockChildren(node);
