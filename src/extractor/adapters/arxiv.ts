@@ -92,10 +92,39 @@ function buildArxivHtmlRoot(source: ParentNode, baseUrl: string): HTMLElement | 
   }
 
   const adapted = preprocessRoot(article, baseUrl);
-  adapted.querySelectorAll(".ltx_tag_bibliography, #license-tr, #watermark-tr").forEach((element) => {
+  sanitizeArxivHtmlRoot(adapted);
+  return adapted;
+}
+
+function sanitizeArxivHtmlRoot(root: HTMLElement): void {
+  root.querySelectorAll(".ltx_tag_bibliography, #license-tr, #watermark-tr, .ltx_authors").forEach((element) => {
     element.remove();
   });
-  return adapted;
+
+  root.querySelectorAll(".ltx_title_abstract").forEach((element) => {
+    if (element.tagName.toLowerCase() === "h2") {
+      return;
+    }
+
+    const heading = document.createElement("h2");
+    heading.className = element.className;
+    heading.textContent = element.textContent?.trim() || "Abstract";
+    element.replaceWith(heading);
+  });
+
+  root.querySelectorAll(".ltx_title .ltx_tag").forEach((element) => {
+    element.remove();
+  });
+
+  const firstSection = root.querySelector(".ltx_section, .ltx_appendix");
+  let current = root.querySelector(".ltx_abstract")?.nextElementSibling ?? root.querySelector(".ltx_title_document")?.nextElementSibling ?? null;
+  while (current && current !== firstSection) {
+    const next = current.nextElementSibling;
+    if (current.matches(".ltx_para, .ltx_block")) {
+      current.remove();
+    }
+    current = next;
+  }
 }
 
 function extractArxivDomMetadata(root: HTMLElement, context: ExtractionContext, ids: ArxivIds): ArxivMetadata {

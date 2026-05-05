@@ -38,7 +38,7 @@ function renderInline(nodes: InlineNode[]): string {
           return node.href ? `[${label}](${node.href})` : label;
         }
         case "lineBreak":
-          return "  \n";
+          return "\\\n";
       }
     })
     .join("");
@@ -108,6 +108,7 @@ export function renderBlocks(blocks: BlockNode[]): string {
     .map((blockNode) => renderBlock(blockNode))
     .join("")
     .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+$/gm, "")
     .trim();
 }
 
