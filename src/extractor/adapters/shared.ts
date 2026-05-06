@@ -1,7 +1,66 @@
 import type { AdaptedContent, ExtractionContext } from "./types";
 
+const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\uFEFF]/g;
+
 function stripDescriptor(value: string, label: string): string {
   return value.replace(new RegExp(`^${label}\\s*:?\\s*`, "i"), "").trim();
+}
+
+export function cleanText(value: string | null | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const cleaned = value.replace(ZERO_WIDTH_PATTERN, "").replace(/\s+/g, " ").trim();
+  return cleaned || undefined;
+}
+
+function toIsoString(value: string): string | undefined {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+}
+
+function normalizeChineseDate(value: string): string | undefined {
+  const match = value.match(
+    /^(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s+(\d{1,2})(?::(\d{1,2})(?::(\d{1,2}))?)?)?$/
+  );
+  if (!match) {
+    return undefined;
+  }
+
+  const [, year, month, day, hour = "0", minute = "0", second = "0"] = match;
+  const local = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
+  return Number.isNaN(local.getTime()) ? undefined : local.toISOString();
+}
+
+function normalizeTimestampSeconds(value: string): string | undefined {
+  if (!/^\d{10}$/.test(value)) {
+    return undefined;
+  }
+
+  const parsed = Number(value) * 1000;
+  return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+}
+
+export function normalizeDateValue(value: string | null | undefined): string | undefined {
+  const cleaned = cleanText(value);
+  if (!cleaned) {
+    return undefined;
+  }
+
+  return (
+    normalizeChineseDate(cleaned) ||
+    normalizeTimestampSeconds(cleaned) ||
+    toIsoString(cleaned.replace(" UTC", " GMT")) ||
+    cleaned
+  );
 }
 
 function getArxivSubmissionHistoryText(document: Document): string | undefined {
@@ -22,8 +81,7 @@ function getArxivModifiedTime(document: Document): string | undefined {
     return undefined;
   }
 
-  const parsed = Date.parse(value.replace(" UTC", " GMT"));
-  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
+  return normalizeDateValue(value);
 }
 
 export function detectSite(document: Document): string {
@@ -114,7 +172,7 @@ export function getDocumentTitle(document: Document): string {
 
 export function getMetaAuthor(document: Document): string | undefined {
   const citationAuthors = Array.from(document.querySelectorAll<HTMLMetaElement>("meta[name='citation_author']"))
-    .map((element) => element.content.trim())
+    .map((element) => cleanText(element.content))
     .filter(Boolean);
   if (citationAuthors.length > 0) {
     return citationAuthors.join(", ");
@@ -131,12 +189,12 @@ export function getMetaAuthor(document: Document): string | undefined {
   }
 
   const meta = document.querySelector("meta[name='author'], meta[property='article:author']");
-  return meta?.getAttribute("content")?.trim() || undefined;
+  return cleanText(meta?.getAttribute("content"));
 }
 
 function getMetaContent(document: Document, selectors: string[]): string | undefined {
   for (const selector of selectors) {
-    const value = document.querySelector(selector)?.getAttribute("content")?.trim();
+    const value = cleanText(document.querySelector(selector)?.getAttribute("content"));
     if (value) {
       return value;
     }
@@ -146,12 +204,18 @@ function getMetaContent(document: Document, selectors: string[]): string | undef
 }
 
 function getWeixinPublishedTime(document: Document): string | undefined {
-  const value = document.querySelector("#publish_time")?.textContent?.trim();
-  return value || undefined;
+  const scriptMatch = document.documentElement.innerHTML.match(
+    /(?:var\s+oriCreateTime|var\s+createTimestamp)\s*=\s*['"](\d{10})['"]/
+  );
+  if (scriptMatch?.[1]) {
+    return normalizeDateValue(scriptMatch[1]);
+  }
+
+  return normalizeDateValue(document.querySelector("#publish_time")?.textContent);
 }
 
 export function getCreatedAt(document: Document): string | undefined {
-  return (
+  return normalizeDateValue(
     getMetaContent(document, [
       "meta[property='article:published_time']",
       "meta[name='article:published_time']",
@@ -171,7 +235,7 @@ export function getCreatedAt(document: Document): string | undefined {
 }
 
 export function getModifiedAt(document: Document): string | undefined {
-  return (
+  return normalizeDateValue(
     getMetaContent(document, [
       "meta[property='article:modified_time']",
       "meta[name='article:modified_time']",
@@ -187,8 +251,7 @@ export function getModifiedAt(document: Document): string | undefined {
 }
 
 export function getText(element: Element | null | undefined): string | undefined {
-  const value = element?.textContent?.trim();
-  return value || undefined;
+  return cleanText(element?.textContent);
 }
 
 export function buildContext(document: Document): ExtractionContext {

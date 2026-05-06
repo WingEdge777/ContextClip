@@ -50,12 +50,19 @@ function absolutize(raw: string, baseUrl: string): string {
   }
 }
 
+function isPlaceholderDataImage(value: string): boolean {
+  return /^data:image\/svg\+xml/i.test(value);
+}
+
 function resolveLazySrc(element: HTMLImageElement): string {
-  return (
-    element.getAttribute("src") ||
+  const lazy =
     element.getAttribute("data-src") ||
     element.getAttribute("data-original") ||
     element.getAttribute("data-actualsrc") ||
+    "";
+  return (
+    lazy ||
+    element.getAttribute("src") ||
     ""
   );
 }
@@ -64,9 +71,12 @@ function normalizeMedia(root: HTMLElement, baseUrl: string): void {
   root.querySelectorAll("img").forEach((node) => {
     const element = node as HTMLImageElement;
     const src = resolveLazySrc(element);
-    if (src) {
-      element.setAttribute("src", absolutize(src, baseUrl));
+    if (!src || isPlaceholderDataImage(src)) {
+      element.remove();
+      return;
     }
+
+    element.setAttribute("src", absolutize(src, baseUrl));
   });
 
   root.querySelectorAll("audio, video, source").forEach((node) => {
