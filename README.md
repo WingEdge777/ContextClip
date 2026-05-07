@@ -14,9 +14,9 @@ Works on login-required pages that server-side fetchers can't reach.
 
 ## What It Does
 
-### Extract This Page
+### Copy This Page
 
-One click. Pull the main content, clean the noise, attach source metadata.
+One click. Pull the main content, clean the noise, attach source metadata, copy Markdown.
 
 ### Pick & Extract
 
@@ -25,10 +25,12 @@ Need only one section, code block, or table:
 - **Hover + click** — pick one semantic block
 - **Drag a rectangle** — capture an exact visual area
 
+Picked content also goes through site-specific cleanup when available.
+
 ### Output
 
 - Text-first pages → `.md`
-- Media-heavy pages → `.zip` with `page.md` + `manifest.json`
+- Media-heavy pages → `.zip` with `page.md` + `manifest.json` + `assets/`
 
 Every result includes YAML frontmatter: title, source URL, site, author, captured time, and extraction mode.
 
@@ -36,10 +38,10 @@ Every result includes YAML frontmatter: title, source URL, site, author, capture
 
 General extraction works on any page via Readability. Deeper cleanup for:
 
-- **arXiv** — full paper via HTML endpoint, metadata via API, abs-page fallback
-- **GitHub** — README, rendered docs, single file views
-- **微信公众号** — article body, author, title
-- **知乎** — column posts, answers
+- **arXiv** — full paper via HTML endpoint, metadata via API, abs-page fallback, page + picked fragments
+- **GitHub** — README, rendered docs, single file views, page + picked fragments
+- **微信公众号** — article body, author, title, page + picked fragments
+- **知乎** — column posts, answers, page + picked fragments
 
 Quality over coverage. Better to trust a few adapters than ship thirty weak ones.
 
@@ -48,6 +50,7 @@ Quality over coverage. Better to trust a few adapters than ship thirty weak ones
 ### Chrome Web Store
 
 Coming soon.
+Use **Load From Source** for now.
 
 ### Load From Source
 
@@ -66,10 +69,10 @@ pnpm build
 ### Extract current page
 
 1. Click extension icon
-2. Click **Extract This Page**
+2. Click **Copy This Page**
 3. Preview the generated Markdown
 4. Markdown is copied immediately
-5. Use **Download File** if you want to save it locally
+5. Use **Download File** or **Download ZIP** if you want to save it locally
 
 ### Select part of a page
 
@@ -116,6 +119,7 @@ For media-heavy pages:
 page-export/
   page.md
   manifest.json
+  assets/
 ```
 
 ## Why It Exists
@@ -131,6 +135,12 @@ ContextClip sits between them.
 ```bash
 pnpm install
 pnpm dev
+```
+
+```bash
+pnpm test:golden
+pnpm test:golden:update
+pnpm bundle:ext
 ```
 
 Watches source and rebuilds `dist/`. After each rebuild:
