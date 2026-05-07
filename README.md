@@ -2,7 +2,7 @@
 
 Chrome extension. Clip precise web context into AI-ready Markdown.
 
-Not a generic web-to-Markdown converter(but can be).
+Not just another web-to-Markdown converter.
 ContextClip is a precision tool for feeding local LLMs.
 
 Text-only LLMs need clean context, not whole pages.
@@ -17,9 +17,11 @@ Works on login-required pages that server-side fetchers can't reach.
 ### Copy This Page
 
 One click. Pull the main content, clean the noise, attach source metadata, copy Markdown.
+![copy this page](resources/2.png)
 
 ### Pick & Extract
 
+![select](resources/1.png)
 Need only one section, code block, or table:
 
 - **Hover + click** — pick one semantic block
@@ -49,7 +51,7 @@ Quality over coverage. Better to trust a few adapters than ship thirty weak ones
 
 ### Chrome Web Store
 
-Coming soon.
+Chrome Web Store listing will be added here.
 Use **Load From Source** for now.
 
 ### Load From Source
@@ -129,6 +131,8 @@ LLMs are good at reasoning over clean text.
 Web pages are not clean text.
 
 ContextClip sits between them.
+
+![logo](resources/logo.png)
 
 ## Development
 
