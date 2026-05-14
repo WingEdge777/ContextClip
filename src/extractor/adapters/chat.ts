@@ -6,6 +6,19 @@ type ChatMessage = {
   content: HTMLElement;
 };
 
+function wrapPlainText(text: string): HTMLElement | null {
+  const value = text.trim();
+  if (!value) {
+    return null;
+  }
+
+  const wrapper = document.createElement("div");
+  const paragraph = document.createElement("p");
+  paragraph.textContent = value;
+  wrapper.appendChild(paragraph);
+  return wrapper;
+}
+
 function cloneIntoWrapper(source: ParentNode | null | undefined): HTMLElement | null {
   if (!source) {
     return null;
@@ -110,20 +123,39 @@ function extractGeminiMessages(root: HTMLElement): ChatMessage[] {
 }
 
 function extractDeepSeekMessages(root: HTMLElement): ChatMessage[] {
-  const nodes = Array.from(root.querySelectorAll<HTMLElement>(".ds-message"));
-  if (nodes.length === 0) {
+  const assistantContents = Array.from(
+    root.querySelectorAll<HTMLElement>(".ds-message .ds-assistant-message-main-content")
+  )
+    .map((node) => cloneIntoWrapper(node))
+    .filter(Boolean) as HTMLElement[];
+
+  if (assistantContents.length === 0) {
     return [];
   }
 
-  const messages: ChatMessage[] = [];
-  const userContent = cloneIntoWrapper(nodes[0].querySelector(".fbb737a4") || nodes[0].firstElementChild);
-  if (userContent) {
-    messages.push({ role: "user", content: userContent });
-  }
+  const sidebarUserContents = Array.from(root.ownerDocument.querySelectorAll<HTMLElement>("._81e7b5e"))
+    .map((node) => getText(node))
+    .filter(Boolean)
+    .map((text) => wrapPlainText(text!))
+    .filter(Boolean) as HTMLElement[];
 
-  for (const node of nodes.slice(1)) {
-    const markdownBlocks = Array.from(node.querySelectorAll<HTMLElement>(".ds-markdown"));
-    const assistantContent = cloneIntoWrapper(markdownBlocks.at(-1));
+  const inlineUserContents = Array.from(root.querySelectorAll<HTMLElement>(".ds-message.d29f3d7d .fbb737a4"))
+    .map((node) => cloneIntoWrapper(node))
+    .filter(Boolean) as HTMLElement[];
+
+  const userContents =
+    sidebarUserContents.length >= assistantContents.length ? sidebarUserContents : inlineUserContents;
+
+  const messages: ChatMessage[] = [];
+  const pairCount = Math.max(userContents.length, assistantContents.length);
+
+  for (let i = 0; i < pairCount; i += 1) {
+    const userContent = userContents[i];
+    const assistantContent = assistantContents[i];
+
+    if (userContent) {
+      messages.push({ role: "user", content: userContent });
+    }
     if (assistantContent) {
       messages.push({ role: "deepseek", content: assistantContent });
     }

@@ -14,12 +14,6 @@ const STRUCTURAL_SELECTORS = [
   "article",
   "main",
   "[role='main']",
-  "#main",
-  "#Main",
-  "#content",
-  "#search",
-  "#rso",
-  "#center_col",
   ".main-content",
   ".mainContent",
   ".content",
@@ -99,6 +93,16 @@ const SEARCH_PRELUDE_PATTERNS = [
   /^\([\d.]+s\)$/
 ];
 
+const SEARCH_NOISE_HEADING_PATTERNS = [
+  /^what people are saying$/i,
+  /^people also ask$/i,
+  /^videos?$/i,
+  /^short videos?$/i,
+  /^images$/i,
+  /^related searches$/i,
+  /^discussions? and forums?$/i
+];
+
 function cloneIntoDocument(root: HTMLElement): Document {
   const doc = document.implementation.createHTMLDocument(document.title);
   doc.body.innerHTML = root.outerHTML;
@@ -117,6 +121,8 @@ function cloneRoot(root: HTMLElement): HTMLElement {
   for (const selector of NOISE_SELECTORS) {
     clone.querySelectorAll(selector).forEach((element) => element.remove());
   }
+
+  clone.querySelectorAll("img[src^='data:']").forEach((element) => element.remove());
 
   clone.querySelectorAll<HTMLElement>("*").forEach((element) => {
     const signature = `${element.id} ${element.className} ${element.getAttribute("role") || ""}`;
@@ -197,6 +203,23 @@ function prependDocumentHeading(root: HTMLElement, documentRoot: HTMLElement): H
   return clone;
 }
 
+function cloneElementsIntoArticle(title: string, elements: HTMLElement[]): HTMLElement | null {
+  if (elements.length === 0) {
+    return null;
+  }
+
+  const article = document.createElement("article");
+  const heading = document.createElement("h1");
+  heading.textContent = title;
+  article.appendChild(heading);
+
+  for (const element of elements) {
+    article.appendChild(cloneRoot(element));
+  }
+
+  return article;
+}
+
 function toArticle(root: HTMLElement): HTMLElement {
   return wrapArticle(cloneRoot(root));
 }
@@ -257,7 +280,7 @@ function pickTitle(root: HTMLElement): string | undefined {
   );
 }
 
-function buildReadabilityCandidate(root: HTMLElement): Candidate | null {
+function buildReadabilityCandidate(root: HTMLElement, source = "readability"): Candidate | null {
   const parsed = new Readability(cloneIntoDocument(root)).parse();
   if (!parsed?.content) {
     return null;
@@ -270,8 +293,8 @@ function buildReadabilityCandidate(root: HTMLElement): Candidate | null {
     root: wrapped,
     title: cleanText(parsed.title) || pickTitle(wrapped),
     author: cleanText(parsed.byline),
-    score: scoreCandidate(wrapped, "readability") + 220,
-    source: "readability"
+    score: scoreCandidate(wrapped, source) + 220,
+    source
   };
 }
 
@@ -327,14 +350,86 @@ function buildSearchResultsCandidate(root: HTMLElement): Candidate | null {
     return null;
   }
 
-  const clone = cloneRoot(resultRoot);
-  trimSearchPrelude(clone);
-  const wrapped = wrapArticle(clone);
+  const blocks = Array.from(resultRoot.querySelectorAll<HTMLElement>(".MjjYud"))
+    .filter((element) => {
+      const text = cleanText(element.textContent) || "";
+      const heading = cleanText(element.querySelector("h3")?.textContent) || "";
+      if (!text || !heading || /function\(\)/.test(text)) {
+        return false;
+      }
+      if (SEARCH_NOISE_HEADING_PATTERNS.some((pattern) => pattern.test(heading))) {
+        return false;
+      }
+      return element.querySelectorAll("a[href]").length > 0;
+    })
+    .filter(
+      (element, index, list) =>
+        list.findIndex(
+          (item) =>
+            cleanText(item.querySelector("h3")?.textContent) === cleanText(element.querySelector("h3")?.textContent)
+        ) === index
+    );
+
+  const article = cloneElementsIntoArticle("Search Results", blocks);
+  if (!article) {
+    return null;
+  }
+
   return {
-    root: wrapped,
+    root: article,
     title: "Search Results",
-    score: scoreCandidate(wrapped, "search") + 420,
+    score: scoreCandidate(article, "search") + 420,
     source: "search"
+  };
+}
+
+function buildDiscussionCandidate(root: HTMLElement): Candidate | null {
+  const title = cleanText(root.querySelector("#Main h1, h1")?.textContent);
+  const body = root.querySelector<HTMLElement>(".topic_content, .entry-content, .post-content, article");
+  const replies = Array.from(root.querySelectorAll<HTMLElement>("#Main [id^='r_'], [id^='r_']"));
+
+  if (!title || !body || replies.length < 2) {
+    return null;
+  }
+
+  const article = document.createElement("article");
+  const heading = document.createElement("h1");
+  heading.textContent = title;
+  article.appendChild(heading);
+  article.appendChild(cloneRoot(body));
+
+  const repliesHeading = document.createElement("h2");
+  repliesHeading.textContent = "Replies";
+  article.appendChild(repliesHeading);
+
+  for (const reply of replies) {
+    const section = document.createElement("section");
+    const author = cleanText(reply.querySelector(".dark")?.textContent);
+    const ago = cleanText(reply.querySelector(".ago")?.textContent);
+    const content = reply.querySelector<HTMLElement>(".reply_content");
+    if (!content) {
+      continue;
+    }
+
+    const replyHeading = document.createElement("h3");
+    replyHeading.textContent = author ? `Reply - ${author}` : "Reply";
+    section.appendChild(replyHeading);
+
+    if (ago) {
+      const meta = document.createElement("p");
+      meta.textContent = ago;
+      section.appendChild(meta);
+    }
+
+    section.appendChild(cloneRoot(content));
+    article.appendChild(section);
+  }
+
+  return {
+    root: article,
+    title,
+    score: scoreCandidate(article, "discussion") + 360,
+    source: "discussion"
   };
 }
 
@@ -417,18 +512,32 @@ function buildGenericRoot(root: HTMLElement): { root: HTMLElement; title?: strin
     };
   }
 
-  const priority = buildPriorityCandidate(root);
-  if (priority && (cleanText(priority.root.textContent)?.length || 0) >= 300) {
+  const discussion = buildDiscussionCandidate(root);
+  if (discussion && (cleanText(discussion.root.textContent)?.length || 0) >= 200) {
     return {
-      root: prependDocumentHeading(priority.root, root),
-      title: priority.title,
-      author: priority.author
+      root: discussion.root,
+      title: discussion.title,
+      author: discussion.author
     };
   }
 
+  const documentReadability = buildReadabilityCandidate(root);
+  if (documentReadability && (cleanText(documentReadability.root.textContent)?.length || 0) >= 200) {
+    return {
+      root: prependDocumentHeading(documentReadability.root, root),
+      title: documentReadability.title,
+      author: documentReadability.author
+    };
+  }
+
+  const priority = buildPriorityCandidate(root);
+  const structural = buildStructuralCandidate(root);
+
   const candidates = [
-    buildReadabilityCandidate(root),
-    buildStructuralCandidate(root),
+    priority ? buildReadabilityCandidate(priority.root, "priority-readability") : null,
+    structural ? buildReadabilityCandidate(structural.root, "structural-readability") : null,
+    priority,
+    structural,
     buildDenseBlockCandidate(root),
     buildClusterCandidate(root),
     buildMarkitdownStyleCandidate(root),
@@ -437,6 +546,13 @@ function buildGenericRoot(root: HTMLElement): { root: HTMLElement; title?: strin
 
   candidates.sort((left, right) => right.score - left.score);
   let winner = candidates[0];
+  const readabilityWinner =
+    candidates.find((candidate) => candidate.source === "priority-readability") ||
+    candidates.find((candidate) => candidate.source === "structural-readability") ||
+    candidates.find((candidate) => candidate.source === "readability");
+  if (readabilityWinner && readabilityWinner.score >= winner.score * 0.55) {
+    winner = readabilityWinner;
+  }
   const focused = candidates.find(
     (candidate) =>
     (candidate.source === "structural" || candidate.source === "dense") &&
