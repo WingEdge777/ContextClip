@@ -66,8 +66,7 @@ Quality over coverage. Better to trust a few adapters than ship thirty weak ones
 
 ### Chrome Web Store / Firefox Add-ons
 
-Store listings will be added here.
-Use blow options for now.
+[Chrome Web Store](https://chromewebstore.google.com/detail/contextclip/djbamidlfmcbldnkccgjdndgoeagaaci?hl=zh-CN&utm_source=ext_sidebar)
 
 ### Install From GitHub Release
 
