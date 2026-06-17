@@ -144,7 +144,7 @@ function activateSelectionMode(): void {
   const overlay = document.createElement("div");
   overlay.id = OVERLAY_ID;
   overlay.style.cssText = [
-    "position:fixed",
+    "position:absolute",
     "z-index:2147483646",
     "pointer-events:none",
     `outline:2px solid ${theme.accent}`,
@@ -157,7 +157,7 @@ function activateSelectionMode(): void {
   const rectEl = document.createElement("div");
   rectEl.id = RECT_ID;
   rectEl.style.cssText = [
-    "position:fixed",
+    "position:absolute",
     "z-index:2147483646",
     "pointer-events:none",
     `border:2px solid ${theme.accent}`,
@@ -279,18 +279,18 @@ function activateSelectionMode(): void {
       }
     }, LONG_PRESS_MS);
 
-    drag = { phase: "pending", startX: event.clientX, startY: event.clientY, timer };
+    drag = { phase: "pending", startX: event.clientX + window.scrollX, startY: event.clientY + window.scrollY, timer };
   };
 
   const handleMouseMove = (event: MouseEvent) => {
     if (drag.phase === "recting") {
-      showRect(drag.startX, drag.startY, event.clientX, event.clientY);
+      showRect(drag.startX, drag.startY, event.clientX + window.scrollX, event.clientY + window.scrollY);
       return;
     }
 
     if (drag.phase === "pending") {
-      const dx = Math.abs(event.clientX - drag.startX);
-      const dy = Math.abs(event.clientY - drag.startY);
+      const dx = Math.abs(event.clientX + window.scrollX - drag.startX);
+      const dy = Math.abs(event.clientY + window.scrollY - drag.startY);
       if (dx > 5 || dy > 5) {
         clearTimeout(drag.timer);
         drag = { phase: "recting", startX: drag.startX, startY: drag.startY };
@@ -315,8 +315,8 @@ function activateSelectionMode(): void {
     }
 
     const rect = hoveredElement.getBoundingClientRect();
-    overlay.style.top = `${rect.top}px`;
-    overlay.style.left = `${rect.left}px`;
+    overlay.style.top = `${rect.top + window.scrollY}px`;
+    overlay.style.left = `${rect.left + window.scrollX}px`;
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
   };
@@ -348,22 +348,22 @@ function activateSelectionMode(): void {
     }
 
     if (drag.phase === "recting") {
-      const x1 = drag.startX;
-      const y1 = drag.startY;
-      const x2 = event.clientX;
-      const y2 = event.clientY;
+      const docX1 = drag.startX;
+      const docY1 = drag.startY;
+      const docX2 = event.clientX + window.scrollX;
+      const docY2 = event.clientY + window.scrollY;
 
       drag = { phase: "idle" };
 
-      if (Math.abs(x2 - x1) < 10 || Math.abs(y2 - y1) < 10) {
+      if (Math.abs(docX2 - docX1) < 10 || Math.abs(docY2 - docY1) < 10) {
         hideRect();
         return;
       }
 
-      const left = Math.min(x1, x2);
-      const top = Math.min(y1, y2);
-      const right = Math.max(x1, x2);
-      const bottom = Math.max(y1, y2);
+      const left = Math.min(docX1, docX2) - window.scrollX;
+      const top = Math.min(docY1, docY2) - window.scrollY;
+      const right = Math.max(docX1, docX2) - window.scrollX;
+      const bottom = Math.max(docY1, docY2) - window.scrollY;
 
       const result = extractFromRect(left, top, right, bottom);
 
