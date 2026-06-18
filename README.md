@@ -81,13 +81,13 @@ Quality over coverage. Better to trust a few adapters than ship thirty weak ones
 ### build From Source
 
 ```bash
-pnpm install
+bun install
 
 # Chrome / Edge
-pnpm build
+bun run build
 
 # Firefox
-pnpm build:firefox
+bun run build:firefox
 ```
 
 **Chrome / Edge:**
@@ -172,16 +172,16 @@ ContextClip sits between them.
 ## Development
 
 ```bash
-pnpm install
-pnpm dev          # Chrome / Edge (watch mode)
-pnpm dev:firefox  # Firefox (watch mode)
+bun install
+bun run dev          # Chrome / Edge (watch mode)
+bun run dev:firefox  # Firefox (watch mode)
 ```
 
 ```bash
-pnpm test:golden
-pnpm test:golden:update
-pnpm bundle:ext          # Chrome package
-pnpm bundle:ext:firefox  # Firefox package
+bun run test:golden
+bun run test:golden:update
+bun run bundle:ext          # Chrome package
+bun run bundle:ext:firefox  # Firefox package
 ```
 
 Watches source and rebuilds `dist/`. After each rebuild:

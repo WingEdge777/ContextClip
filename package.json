@@ -2,15 +2,15 @@
   "name": "context-clip",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.22.0",
+  "packageManager": "bun@1.3.14",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
     "dev:firefox": "BROWSER=firefox vite build --watch",
     "build": "vite build",
     "build:firefox": "BROWSER=firefox vite build",
-    "bundle:ext": "pnpm build && cd dist && zip -r ../contextclip-extension.zip .",
-    "bundle:ext:firefox": "pnpm build:firefox && cd dist && zip -r ../contextclip-firefox.zip .",
+    "bundle:ext": "bun run build && cd dist && zip -r ../contextclip-extension.zip .",
+    "bundle:ext:firefox": "bun run build:firefox && cd dist && zip -r ../contextclip-firefox.zip .",
     "test:golden": "tsx scripts/golden-test.ts",
     "test:golden:update": "tsx scripts/golden-test.ts --update",
     "test:golden:accept": "tsx scripts/golden-test.ts --update --force"
